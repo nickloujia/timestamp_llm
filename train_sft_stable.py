@@ -465,7 +465,13 @@ class EvaluationCallback(TrainerCallback):
 class StableTrainer:
     """稳定的SFT训练器"""
     def __init__(self):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # 优先使用CUDA，其次是MPS（MacBook GPU），最后是CPU
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+        else:
+            self.device = torch.device('cpu')
         print(f"使用设备: {self.device}")
         
         # 加载模型和tokenizer - 使用配置文件参数
@@ -482,13 +488,25 @@ class StableTrainer:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         
         # 加载模型，使用配置文件中的设置
-        torch_dtype = torch.float32 if Config.TORCH_DTYPE == "float32" else torch.float16
+        # 根据设备类型调整加载参数
+        if self.device.type == 'mps':
+            # MPS设备使用float32以提高兼容性
+            torch_dtype = torch.float32
+            device_map = None  # 让模型加载到CPU，然后手动移动到MPS
+        else:
+            torch_dtype = torch.float32 if Config.TORCH_DTYPE == "float32" else torch.float16
+            device_map = Config.DEVICE_MAP
+        
         self.model = AutoModelForCausalLM.from_pretrained(
             Config.MODEL_NAME,
             torch_dtype=torch_dtype,
-            device_map=Config.DEVICE_MAP,
+            device_map=device_map,
             trust_remote_code=Config.TRUST_REMOTE_CODE
         )
+        
+        # 如果是MPS设备，手动将模型移动到MPS
+        if self.device.type == 'mps':
+            self.model = self.model.to(self.device)
         
         # 确保模型的pad_token_id正确设置
         self.model.config.pad_token_id = self.tokenizer.pad_token_id

@@ -55,18 +55,38 @@ class TimestampDataset(Dataset):
 class QwenSFTTrainer:
     """基于Qwen2.5-1.5B的SFT训练器"""
     def __init__(self):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # 优先使用CUDA，其次是MPS（MacBook GPU），最后是CPU
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+        else:
+            self.device = torch.device('cpu')
         print(f"使用设备: {self.device}")
         
         # 加载预训练模型和tokenizer
         print(f"正在加载模型: {Config.MODEL_NAME}")
         self.tokenizer = AutoTokenizer.from_pretrained(Config.MODEL_NAME, trust_remote_code=Config.TRUST_REMOTE_CODE)
+        
+        # 根据设备类型调整加载参数
+        if self.device.type == 'mps':
+            # MPS设备使用float32以提高兼容性
+            torch_dtype = torch.float32
+            device_map = None  # 让模型加载到CPU，然后手动移动到MPS
+        else:
+            torch_dtype = getattr(torch, Config.TORCH_DTYPE)
+            device_map = Config.DEVICE_MAP
+        
         self.model = AutoModelForCausalLM.from_pretrained(
             Config.MODEL_NAME,
-            torch_dtype=getattr(torch, Config.TORCH_DTYPE),
-            device_map=Config.DEVICE_MAP,
+            torch_dtype=torch_dtype,
+            device_map=device_map,
             trust_remote_code=Config.TRUST_REMOTE_CODE
         )
+        
+        # 如果是MPS设备，手动将模型移动到MPS
+        if self.device.type == 'mps':
+            self.model = self.model.to(self.device)
         
         # 设置pad_token
         if self.tokenizer.pad_token is None:

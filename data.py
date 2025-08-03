@@ -1,5 +1,6 @@
 import json
 import random
+import os
 from datetime import datetime, timedelta
 import pytz
 
@@ -98,6 +99,33 @@ def main():
     """主函数：生成训练和测试数据"""
     print("开始生成数据...")
     
+    # 检查并创建data目录
+    data_dir = 'data'
+    if not os.path.exists(data_dir):
+        print(f"创建目录: {data_dir}")
+        os.makedirs(data_dir)
+    
+    # 检查是否已存在数据文件
+    train_file = os.path.join(data_dir, 'train.json')
+    test_file = os.path.join(data_dir, 'test.json')
+    
+    if os.path.exists(train_file) and os.path.exists(test_file):
+        print("✅ 数据文件已存在:")
+        print(f"   训练文件: {train_file}")
+        print(f"   测试文件: {test_file}")
+        
+        # 显示文件大小
+        train_size = os.path.getsize(train_file) / 1024  # KB
+        test_size = os.path.getsize(test_file) / 1024   # KB
+        print(f"   训练文件大小: {train_size:.1f} KB")
+        print(f"   测试文件大小: {test_size:.1f} KB")
+        
+        # 询问是否重新生成
+        response = input("\n是否重新生成数据？(y/N): ").strip().lower()
+        if response not in ['y', 'yes']:
+            print("保持现有数据文件不变。")
+            return
+    
     # 生成训练数据
     print("生成训练数据...")
     train_data = generate_timestamp_data(50000)
@@ -112,20 +140,26 @@ def main():
     
     # 保存训练数据
     print("保存训练数据...")
-    with open('data/train.json', 'w', encoding='utf-8') as f:
+    with open(train_file, 'w', encoding='utf-8') as f:
         for item in train_data:
             f.write(json.dumps(item, ensure_ascii=False) + '\n')
     
     # 保存测试数据
     print("保存测试数据...")
-    with open('data/test.json', 'w', encoding='utf-8') as f:
+    with open(test_file, 'w', encoding='utf-8') as f:
         for item in test_data:
             f.write(json.dumps(item, ensure_ascii=False) + '\n')
     
-    print(f"数据生成完成！")
-    print(f"训练数据：{len(train_data)} 条")
-    print(f"测试数据：{len(test_data)} 条")
-    print(f"数据已保存到 data/ 目录")
+    print(f"✅ 数据生成完成！")
+    print(f"📊 训练数据：{len(train_data)} 条")
+    print(f"📊 测试数据：{len(test_data)} 条")
+    print(f"📁 数据已保存到 {data_dir}/ 目录")
+    
+    # 显示生成的文件大小
+    train_size = os.path.getsize(train_file) / 1024  # KB
+    test_size = os.path.getsize(test_file) / 1024   # KB
+    print(f"📏 训练文件大小: {train_size:.1f} KB")
+    print(f"📏 测试文件大小: {test_size:.1f} KB")
 
 if __name__ == "__main__":
     main()

@@ -17,7 +17,13 @@ class TimestampInference:
             model_path: 训练好的模型路径
         """
         self.model_path = model_path
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # 优先使用CUDA，其次是MPS（MacBook GPU），最后是CPU
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+        else:
+            self.device = torch.device('cpu')
         print(f"使用设备: {self.device}")
         
         # 加载模型和tokenizer
